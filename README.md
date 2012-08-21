@@ -12,6 +12,10 @@ Built considering GSVideo live streaming video troubles.
 
 [VLCJ github page](https://github.com/caprica/vlcj)
 
+## Install
+
+Download and unzip [library archive](http://devdep.ru/processing/VLCJVideo.tar.gz) into your Processing libraries folder.
+
 ## Example
 
 ```java
