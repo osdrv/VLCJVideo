@@ -179,7 +179,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 			}
 		} finally {
 			mediaPlayer.prepareMedia(filename);
-			mediaPlayer.start();
 		}
 	}
 
