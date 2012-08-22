@@ -32,13 +32,19 @@ import processing.core.PConstants;
 import processing.core.PImage;
 
 import uk.co.caprica.vlcj.binding.LibVlc;
+import uk.co.caprica.vlcj.player.MediaPlayer;
+import uk.co.caprica.vlcj.player.MediaPlayerEventAdapter;
 import uk.co.caprica.vlcj.player.MediaPlayerFactory;
 import uk.co.caprica.vlcj.player.direct.DirectMediaPlayer;
 import uk.co.caprica.vlcj.player.direct.RenderCallback;
+import uk.co.caprica.vlcj.player.events.MediaPlayerEventType;
 import uk.co.caprica.vlcj.runtime.RuntimeUtil;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 
 import com.sun.jna.Memory;
 
@@ -64,8 +70,31 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	protected static Boolean inited = false; 
 	public static String vlcLibPath = "";
 	
+	protected final HashMap<MediaPlayerEventType, ArrayList<Runnable>> handlers;
+	
 	public static void setVLCLibPath( String path ) {
 		vlcLibPath = path;
+	}
+	
+	public void bind( MediaPlayerEventType type, Runnable handler ) {
+		ArrayList<Runnable> eventHandlers;
+		if ( !handlers.containsKey( type ) ) {
+			eventHandlers = new ArrayList<Runnable>();
+			handlers.put( type, eventHandlers );
+		} else {
+			eventHandlers = handlers.get( type );
+		}
+		eventHandlers.add( handler );
+	}
+	
+	public void handleEvent( MediaPlayerEventType type ) {
+		if ( handlers.containsKey( type ) ) {
+			ArrayList<Runnable> eventHandlers = handlers.get( type );
+			Iterator<Runnable> it = eventHandlers.iterator();
+			while( it.hasNext() ) {
+				it.next().run();
+			}
+		}
 	}
 	
 	protected static void init() {
@@ -92,6 +121,7 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		width = parent.width;
 		height = parent.height;
 		VLCJVideo.init();
+		handlers = new HashMap<MediaPlayerEventType, ArrayList<Runnable>>();
 		initVLC(parent, options);
 	}
 	
@@ -101,6 +131,42 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		parent.registerDispose(this);
 		factory = new MediaPlayerFactory(options);
 		mediaPlayer = factory.newDirectMediaPlayer(width, height, this);
+		bindMediaPlayerEvents();
+	}
+	
+	protected void bindMediaPlayerEvents() {
+		mediaPlayer.addMediaPlayerEventListener( new MediaPlayerEventAdapter() {
+			
+			public void opening( MediaPlayer mp ) {
+				handleEvent( MediaPlayerEventType.OPENING );
+			}
+			
+			public void error(MediaPlayer mediaPlayer) {
+				handleEvent( MediaPlayerEventType.ERROR );
+			}
+			
+			public void finished(MediaPlayer mediaPlayer) {
+				handleEvent( MediaPlayerEventType.FINISHED );
+			}
+			
+			public void paused(MediaPlayer mediaPlayer) {
+				handleEvent( MediaPlayerEventType.PAUSED );
+			}
+			
+			public void stopped(MediaPlayer mediaPlayer) {
+				handleEvent( MediaPlayerEventType.STOPPED );
+			}
+			
+			public void playing(MediaPlayer mediaPlayer) {
+				handleEvent( MediaPlayerEventType.PLAYING );
+			}
+			
+			public void mediaStateChanged(MediaPlayer mediaPlayer,
+                    int newState) {
+				handleEvent( MediaPlayerEventType.MEDIA_STATE_CHANGED );
+			}
+			
+		} );
 	}
 
 	public void openMedia(String mrl) {
