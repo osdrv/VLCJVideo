@@ -10,7 +10,7 @@ protected final static int HEIGHT = 1080;
 void setup() {
   size( WIDTH, HEIGHT );
   video = new VLCJVideo( this, "--no-video-title-show" );
-  video.openMedia( "http://fotobank.home/5sec_horiz-Desktop.mp4" );
+  video.openMedia( "http://example.com/movie.mp4" );
   video.loop();
   video.play();
   bindVideoEvents();
