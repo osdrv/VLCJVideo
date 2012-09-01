@@ -54,12 +54,12 @@ import com.sun.jna.NativeLibrary;
 public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 
 	public final static String VERSION = "##library.prettyVersion##";
-	
+
 	protected int[] copyPixels = null;
 	protected PApplet parent = null;
 
-	private int width;
-	private int height;
+	public int width;
+	public int height;
 
 	protected String filename;
 	protected Boolean firstFrame;
@@ -67,43 +67,43 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	protected MediaPlayerFactory factory;
 	protected DirectMediaPlayer mediaPlayer;
 
-	protected static Boolean inited = false; 
+	protected static Boolean inited = false;
 	public static String vlcLibPath = "";
-	
+
 	protected final HashMap<MediaPlayerEventType, ArrayList<Runnable>> handlers;
-	
-	public static void setVLCLibPath( String path ) {
+
+	public static void setVLCLibPath(String path) {
 		vlcLibPath = path;
 	}
-	
-	public void bind( MediaPlayerEventType type, Runnable handler ) {
+
+	public void bind(MediaPlayerEventType type, Runnable handler) {
 		ArrayList<Runnable> eventHandlers;
-		if ( !handlers.containsKey( type ) ) {
+		if (!handlers.containsKey(type)) {
 			eventHandlers = new ArrayList<Runnable>();
-			handlers.put( type, eventHandlers );
+			handlers.put(type, eventHandlers);
 		} else {
-			eventHandlers = handlers.get( type );
+			eventHandlers = handlers.get(type);
 		}
-		eventHandlers.add( handler );
+		eventHandlers.add(handler);
 	}
-	
-	public void handleEvent( MediaPlayerEventType type ) {
-		if ( handlers.containsKey( type ) ) {
-			ArrayList<Runnable> eventHandlers = handlers.get( type );
+
+	public void handleEvent(MediaPlayerEventType type) {
+		if (handlers.containsKey(type)) {
+			ArrayList<Runnable> eventHandlers = handlers.get(type);
 			Iterator<Runnable> it = eventHandlers.iterator();
-			while( it.hasNext() ) {
+			while (it.hasNext()) {
 				it.next().run();
 			}
 		}
 	}
-	
+
 	protected static void init() {
-		if ( inited )
+		if (inited)
 			return;
-		
+
 		inited = true;
-		
-		if ( vlcLibPath == "" ) {
+
+		if (vlcLibPath == "") {
 			if (PApplet.platform == MACOSX) {
 				vlcLibPath = "/Applications/VLC.app/Contents/MacOS/lib";
 			} else if (PApplet.platform == WINDOWS) {
@@ -112,8 +112,9 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 				vlcLibPath = "/home/linux/vlc/install/lib";
 			}
 		}
-		NativeLibrary.addSearchPath( RuntimeUtil.getLibVlcLibraryName(), vlcLibPath );
-		Native.loadLibrary( RuntimeUtil.getLibVlcLibraryName(), LibVlc.class );
+		NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcLibraryName(),
+				vlcLibPath);
+		Native.loadLibrary(RuntimeUtil.getLibVlcLibraryName(), LibVlc.class);
 	}
 
 	public VLCJVideo(PApplet parent, String... options) {
@@ -124,7 +125,7 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		handlers = new HashMap<MediaPlayerEventType, ArrayList<Runnable>>();
 		initVLC(parent, options);
 	}
-	
+
 	protected void initVLC(PApplet parent, String... options) {
 		this.parent = parent;
 		firstFrame = true;
@@ -133,40 +134,39 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		mediaPlayer = factory.newDirectMediaPlayer(width, height, this);
 		bindMediaPlayerEvents();
 	}
-	
+
 	protected void bindMediaPlayerEvents() {
-		mediaPlayer.addMediaPlayerEventListener( new MediaPlayerEventAdapter() {
-			
-			public void opening( MediaPlayer mp ) {
-				handleEvent( MediaPlayerEventType.OPENING );
+		mediaPlayer.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
+
+			public void opening(MediaPlayer mp) {
+				handleEvent(MediaPlayerEventType.OPENING);
 			}
-			
+
 			public void error(MediaPlayer mediaPlayer) {
-				handleEvent( MediaPlayerEventType.ERROR );
+				handleEvent(MediaPlayerEventType.ERROR);
 			}
-			
+
 			public void finished(MediaPlayer mediaPlayer) {
-				handleEvent( MediaPlayerEventType.FINISHED );
+				handleEvent(MediaPlayerEventType.FINISHED);
 			}
-			
+
 			public void paused(MediaPlayer mediaPlayer) {
-				handleEvent( MediaPlayerEventType.PAUSED );
+				handleEvent(MediaPlayerEventType.PAUSED);
 			}
-			
+
 			public void stopped(MediaPlayer mediaPlayer) {
-				handleEvent( MediaPlayerEventType.STOPPED );
+				handleEvent(MediaPlayerEventType.STOPPED);
 			}
-			
+
 			public void playing(MediaPlayer mediaPlayer) {
-				handleEvent( MediaPlayerEventType.PLAYING );
+				handleEvent(MediaPlayerEventType.PLAYING);
 			}
-			
-			public void mediaStateChanged(MediaPlayer mediaPlayer,
-                    int newState) {
-				handleEvent( MediaPlayerEventType.MEDIA_STATE_CHANGED );
+
+			public void mediaStateChanged(MediaPlayer mediaPlayer, int newState) {
+				handleEvent(MediaPlayerEventType.MEDIA_STATE_CHANGED);
 			}
-			
-		} );
+
+		});
 	}
 
 	public void openMedia(String mrl) {
@@ -194,16 +194,16 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		mediaPlayer.pause();
 	}
 
-	public long time() {
-		return mediaPlayer.getTime() / 1000;
+	public float time() {
+		return (float) ((float) mediaPlayer.getTime() / 1000.0);
 	}
 
-	public long duration() {
-		return mediaPlayer.getLength() / 1000;
+	public float duration() {
+		return (float) ((float) mediaPlayer.getLength() / 1000.0);
 	}
 
-	public void jump(long pos) {
-		mediaPlayer.setTime(pos * 1000);
+	public void jump(float pos) {
+		mediaPlayer.setTime(Math.round(pos * 1000));
 	}
 
 	public void loop() {
