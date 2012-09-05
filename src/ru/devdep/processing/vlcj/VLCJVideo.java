@@ -100,7 +100,7 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	protected static void init() {
 		if (inited)
 			return;
-
+		
 		inited = true;
 
 		if (vlcLibPath == "") {
@@ -206,6 +206,23 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		mediaPlayer.setTime(Math.round(pos * 1000));
 	}
 
+	
+	public boolean isPlaying() {
+		return mediaPlayer.isPlaying();
+	}
+	
+	public boolean isPlayable() {
+		return mediaPlayer.isPlayable();
+	}
+	
+	public boolean isSeekable() {
+		return mediaPlayer.isSeekable();
+	}
+	
+	public boolean canPause() {
+		return mediaPlayer.canPause();
+	}
+	
 	public void loop() {
 		mediaPlayer.setRepeat(true);
 	}
@@ -213,7 +230,11 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	public void noLoop() {
 		mediaPlayer.setRepeat(false);
 	}
-
+	
+	public void mute() {
+		volume( 0.0f );
+	}
+	
 	public void volume(float volume) {
 		if (volume < 0.0) {
 			volume = (float) 0.0;
