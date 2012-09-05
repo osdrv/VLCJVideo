@@ -14,7 +14,7 @@ Built considering GSVideo live streaming video troubles.
 
 ## Install
 
-Download and unzip [library archive](https://github.com/4pcbr/VLCJVideo/raw/master/distribution/VLCJVideo-1/download/VLCJVideo.zip) into your Processing libraries folder.
+Download and unzip [library archive](https://github.com/4pcbr/VLCJVideo/raw/master/distribution/VLCJVideo-2/download/VLCJVideo.zip) into your Processing libraries folder.
 
 ## Example
 
