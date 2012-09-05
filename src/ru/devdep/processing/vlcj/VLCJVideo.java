@@ -32,19 +32,27 @@ import processing.core.PConstants;
 import processing.core.PImage;
 
 import uk.co.caprica.vlcj.binding.LibVlc;
+import uk.co.caprica.vlcj.player.MediaMeta;
 import uk.co.caprica.vlcj.player.MediaPlayer;
 import uk.co.caprica.vlcj.player.MediaPlayerEventAdapter;
 import uk.co.caprica.vlcj.player.MediaPlayerFactory;
+import uk.co.caprica.vlcj.player.TrackInfo;
+import uk.co.caprica.vlcj.player.VideoTrackInfo;
 import uk.co.caprica.vlcj.player.direct.DirectMediaPlayer;
 import uk.co.caprica.vlcj.player.direct.RenderCallback;
 import uk.co.caprica.vlcj.player.events.MediaPlayerEventType;
+import uk.co.caprica.vlcj.player.headless.HeadlessMediaPlayer;
 import uk.co.caprica.vlcj.runtime.RuntimeUtil;
+
+import uk.co.caprica.vlcj.binding.internal.libvlc_media_t;
 
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Stack;
 
 import com.sun.jna.Memory;
 
@@ -63,15 +71,20 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 
 	protected String filename;
 	protected Boolean firstFrame;
-
+	protected Boolean ready = false;
+	protected Boolean repeat = false;
+	protected float volume = 1.0f;
+	
 	protected MediaPlayerFactory factory;
 	protected DirectMediaPlayer mediaPlayer;
+	protected HeadlessMediaPlayer headlessMediaPlayer;
 
 	protected static Boolean inited = false;
 	public static String vlcLibPath = "";
 
 	protected final HashMap<MediaPlayerEventType, ArrayList<Runnable>> handlers;
-
+	protected final Stack<Runnable> tasks;
+	
 	public static void setVLCLibPath(String path) {
 		vlcLibPath = path;
 	}
@@ -119,24 +132,105 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 
 	public VLCJVideo(PApplet parent, String... options) {
 		super(0, 0, PApplet.RGB);
-		width = parent.width;
-		height = parent.height;
+		width = 0;
+		height = 0;
 		VLCJVideo.init();
+		
+		tasks = new Stack<Runnable>();
 		handlers = new HashMap<MediaPlayerEventType, ArrayList<Runnable>>();
+		
 		initVLC(parent, options);
 	}
 
 	protected void initVLC(PApplet parent, String... options) {
 		this.parent = parent;
 		firstFrame = true;
-		parent.registerDispose(this);
 		factory = new MediaPlayerFactory(options);
-		mediaPlayer = factory.newDirectMediaPlayer(width, height, this);
-		bindMediaPlayerEvents();
+		headlessMediaPlayer = factory.newHeadlessMediaPlayer();
+		bindHeadlessMediaPlayerEvents( headlessMediaPlayer );
+	}
+	
+	protected void scheduleTask( Runnable task ) {
+		this.tasks.push( task );
+		if ( isReady() ) {
+			runTasks();
+		}
+	}
+	
+	protected void runTasks() {
+		while ( !tasks.empty() ) {
+			tasks.pop().run();
+		}
 	}
 
-	protected void bindMediaPlayerEvents() {
-		mediaPlayer.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
+	protected void bindHeadlessMediaPlayerEvents( HeadlessMediaPlayer hmp ) {
+		
+		hmp.addMediaPlayerEventListener( new MediaPlayerEventAdapter() {
+			
+			public void mediaChanged( MediaPlayer mp, libvlc_media_t media, String mrl ) {
+				System.out.println( mrl );
+				setReady( false );
+			}
+			
+			public void error(MediaPlayer mediaPlayer) {
+				handleEvent(MediaPlayerEventType.ERROR);
+		    }
+			
+			public void videoOutput( MediaPlayer mp, int newCount ) {
+				
+				List<TrackInfo> info = mp.getTrackInfo();
+				Iterator<TrackInfo> it = info.iterator();
+				
+				boolean dim_parsed = false;
+				
+				System.out.println( info.toString() );
+				
+				while ( it.hasNext() ) {
+					TrackInfo ti = it.next();
+					if ( ti instanceof VideoTrackInfo ) {
+						width = ((VideoTrackInfo) ti).width();
+						height = ((VideoTrackInfo) ti).height();
+						if ( width == 0 ) width = parent.width;
+						if ( height == 0 ) height = parent.height;
+						System.out.println( ti.toString() );
+						System.out.println( String.format( "video dim: %dx%d", width, height ) );
+						dim_parsed = true;
+						break;
+					}
+				}
+				if ( !dim_parsed ) {
+					System.out.println(
+						String.format( "Unable to parse media data: %s", filename )
+					);
+				} else {
+					mp.stop();
+					setReady( true );
+					initNewMediaPlayer();
+				}
+			}
+			
+			public void mediaStateChanged( MediaPlayer mediaPlayer, int newState ) {
+				System.out.println( String.format( "New media state: %d", newState ) );
+			}
+		} );
+		
+	}
+	
+	protected void initNewMediaPlayer() {
+		if ( mediaPlayer != null )
+			releaseMediaPlayer( mediaPlayer );
+		mediaPlayer = factory.newDirectMediaPlayer(width, height, this);
+		copyPixels = new int[width * height];
+		firstFrame = true;
+		bindMediaPlayerEvents( mediaPlayer );
+		mediaPlayer.prepareMedia(filename);
+		mediaPlayer.setRepeat( repeat );
+		setVolume( volume );
+		runTasks();
+	}
+	
+	protected void bindMediaPlayerEvents( MediaPlayer mp1 ) {
+		mp1.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
 
 			public void opening(MediaPlayer mp) {
 				handleEvent(MediaPlayerEventType.OPENING);
@@ -170,7 +264,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	}
 
 	public void openMedia(String mrl) {
-		copyPixels = new int[width * height];
 		try {
 			filename = parent.dataPath(mrl);
 			File f = new File(filename);
@@ -178,73 +271,103 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 				filename = mrl;
 			}
 		} finally {
-			mediaPlayer.prepareMedia(filename);
+			headlessMediaPlayer.prepareMedia(filename);
+			headlessMediaPlayer.parseMedia();
+			headlessMediaPlayer.start();
 		}
 	}
 
 	public void play() {
-		mediaPlayer.play();
+		scheduleTask( new Runnable() { public void run() {
+			if ( isReady() )
+				mediaPlayer.play();
+		} } );
 	}
 
 	public void stop() {
-		mediaPlayer.stop();
+		scheduleTask( new Runnable() { public void run() {
+			if ( isReady() )
+				mediaPlayer.stop();
+		} } );
 	}
 
 	public void pause() {
-		mediaPlayer.pause();
+		scheduleTask( new Runnable() { public void run() {
+			if ( isReady() )
+				mediaPlayer.pause();
+		} } );
 	}
 
 	public float time() {
-		return (float) ((float) mediaPlayer.getTime() / 1000.0);
+		return isReady() ? (float) ((float) mediaPlayer.getTime() / 1000.0) : 0.0f;
 	}
 
 	public float duration() {
-		return (float) ((float) mediaPlayer.getLength() / 1000.0);
+		return isReady() ? (float) ((float) mediaPlayer.getLength() / 1000.0) : 0.0f;
 	}
 
-	public void jump(float pos) {
-		mediaPlayer.setTime(Math.round(pos * 1000));
+	public void jump(final float pos) {
+		scheduleTask( new Runnable() { public void run() {
+			if ( isReady() )
+				mediaPlayer.setTime(Math.round(pos * 1000));
+		} } );
 	}
 
+	public boolean isReady() {
+		return mediaPlayer != null && ready;
+	}
+	
+	protected void setReady( Boolean ready ) {
+		this.ready = ready;
+	}
 	
 	public boolean isPlaying() {
-		return mediaPlayer.isPlaying();
+		return isReady() && mediaPlayer.isPlaying();
 	}
 	
 	public boolean isPlayable() {
-		return mediaPlayer.isPlayable();
+		return isReady() && isReady() && mediaPlayer.isPlayable();
 	}
 	
 	public boolean isSeekable() {
-		return mediaPlayer.isSeekable();
+		return isReady()  && isReady() && mediaPlayer.isSeekable();
 	}
 	
 	public boolean canPause() {
-		return mediaPlayer.canPause();
+		return isReady() && mediaPlayer.canPause();
 	}
 	
 	public void loop() {
-		mediaPlayer.setRepeat(true);
+		repeat = true;
+		if ( isReady() )
+			mediaPlayer.setRepeat(true);
 	}
 
 	public void noLoop() {
-		mediaPlayer.setRepeat(false);
+		repeat = false;
+		if ( isReady() )
+			mediaPlayer.setRepeat(false);
 	}
 	
 	public void mute() {
-		volume( 0.0f );
+		setVolume( 0.0f );
 	}
 	
-	public void volume(float volume) {
+	public void setVolume(float volume) {
 		if (volume < 0.0) {
 			volume = (float) 0.0;
 		} else if (volume > 1.0) {
 			volume = (float) 1.0;
 		}
-		mediaPlayer.setVolume(parent.round((float) (200.0) * volume));
+		this.volume = volume;
+		if ( isReady() )
+			mediaPlayer.setVolume(parent.round((float) (200.0) * volume));
 	}
 
 	public synchronized void display(Memory memory) {
+		if ( !isReady() )
+			return;
+		
 		memory.read(0, copyPixels, 0, width * height);
 		if (firstFrame) {
 			super.init(width, height, parent.ARGB);
@@ -255,14 +378,21 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 	}
 
 	public void dispose() {
-		if (mediaPlayer != null) {
-			if (mediaPlayer.isPlaying()) {
-				mediaPlayer.stop();
-			}
-			mediaPlayer.release();
+		if (isReady()) {
+			releaseMediaPlayer( mediaPlayer );
+		}
+		if (isReady()) {
+			releaseMediaPlayer( headlessMediaPlayer );
 		}
 		factory.release();
 		copyPixels = null;
+	}
+
+	protected void releaseMediaPlayer(MediaPlayer mp) {
+		if (mp.isPlaying()) {
+			mp.stop();
+		}
+		mp.release();
 	}
 
 	protected void finalize() throws Throwable {
