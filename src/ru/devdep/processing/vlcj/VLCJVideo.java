@@ -168,7 +168,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 		hmp.addMediaPlayerEventListener( new MediaPlayerEventAdapter() {
 			
 			public void mediaChanged( MediaPlayer mp, libvlc_media_t media, String mrl ) {
-				System.out.println( mrl );
 				setReady( false );
 			}
 			
@@ -183,8 +182,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 				
 				boolean dim_parsed = false;
 				
-				System.out.println( info.toString() );
-				
 				while ( it.hasNext() ) {
 					TrackInfo ti = it.next();
 					if ( ti instanceof VideoTrackInfo ) {
@@ -192,8 +189,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 						height = ((VideoTrackInfo) ti).height();
 						if ( width == 0 ) width = parent.width;
 						if ( height == 0 ) height = parent.height;
-						System.out.println( ti.toString() );
-						System.out.println( String.format( "video dim: %dx%d", width, height ) );
 						dim_parsed = true;
 						break;
 					}
@@ -207,10 +202,6 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 					setReady( true );
 					initNewMediaPlayer();
 				}
-			}
-			
-			public void mediaStateChanged( MediaPlayer mediaPlayer, int newState ) {
-				System.out.println( String.format( "New media state: %d", newState ) );
 			}
 		} );
 		
