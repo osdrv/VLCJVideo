@@ -195,8 +195,9 @@ public class VLCJVideo extends PImage implements PConstants, RenderCallback {
 				}
 				if ( !dim_parsed ) {
 					System.out.println(
-						String.format( "Unable to parse media data: %s", filename )
+						String.format( "Unable to parse media data, %s could not be played", filename )
 					);
+					handleEvent(MediaPlayerEventType.ERROR);
 				} else {
 					mp.stop();
 					setReady( true );
